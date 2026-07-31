@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attendance Management</title>
+  <style>
+    :root {
+      font-family: Inter, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1d2129;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #4c6ef5 0%, #3652c4 100%);
+      color: #1c1e21;
+      overflow-x: hidden;
+    }
+
+    body, button, input, select {
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    a {
+      color: #1877f2;
+      text-decoration: none;
+    }
+
+    main {
+      display: grid;
+      min-height: calc(100vh - 40px);
+      gap: 24px;
+      padding: 24px;
+      align-items: start;
+      justify-items: center;
+    }
+
+    .layout {
+      width: min(1120px, 100%);
+      display: grid;
+      grid-template-columns: minmax(280px, 1.8fr) minmax(300px, 1.2fr);
+      gap: 32px;
+      align-items: center;
+    }
+
+    .hero-panel {
+      color: white;
+      padding: 48px 40px;
+      border-radius: 32px;
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 40px 120px rgba(15, 23, 42, 0.24);
+    }
+
+    .hero-panel h1 {
+      margin: 0;
+      font-size: clamp(3rem, 5vw, 4.5rem);
+      line-height: 1;
+      letter-spacing: -1px;
+    }
+
+    .hero-panel p {
+      max-width: 520px;
+      margin: 24px 0 0;
+      font-size: 1.1rem;
+      line-height: 1.7;
+      color: #e9ebee;
+    }
+
+    .hero-features {
+      display: grid;
+      gap: 16px;
+      margin-top: 34px;
+    }
+
+    .hero-feature {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      font-size: 0.98rem;
+      color: #e9ebee;
+    }
+
+    .hero-feature::before {
+      content: '✓';
+      display: inline-flex;
+      margin-top: 2px;
+      color: #42b72a;
+      font-weight: 700;
+    }
+
+    .login-panel {
+      width: 100%;
+      min-width: 320px;
+    }
+
+    .login-card {
+      padding: 32px;
+      border-radius: 28px;
+      background: #ffffff;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .login-card h2 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      color: #050505;
+    }
+
+    .login-card p {
+      margin: 0 0 22px;
+      color: #606770;
+      line-height: 1.6;
+    }
+
+    .role-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .role-pill {
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid #d8dadd;
+      background: #f2f3f5;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .role-pill:hover {
+      transform: translateY(-2px);
+    }
+
+    .role-pill.active {
+      border-color: #1877f2;
+      background: #e7f3ff;
+    }
+
+    label {
+      display: grid;
+      gap: 10px;
+      font-weight: 600;
+      color: #050505;
+      font-size: 0.95rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid #ccd0d5;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus {
+      border-color: #1877f2;
+      box-shadow: 0 0 0 4px rgba(24, 119, 242, 0.12);
+    }
+
+    .actions {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .button-primary {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: none;
+      color: white;
+      background: #1877f2;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .button-primary:hover {
+      background: #145db2;
+    }
+
+    .button-secondary {
+      width: 100%;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid #ccd0d5;
+      background: white;
+      color: #050505;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .login-link-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      font-size: 0.95rem;
+      margin-top: 4px;
+      color: #606770;
+    }
+
+    .hint {
+      color: #606770;
+      font-size: 0.95rem;
+      margin-top: 8px;
+    }
+
+    .message {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+    }
+
+    .message.hidden {
+      display: none !important;
+    }
+
+    .message.error {
+      display: block;
+      background: #fbeae9;
+      color: #b71c1c;
+    }
+
+    .message.info {
+      display: block;
+      background: #e7f3ff;
+      color: #1d4ed8;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .sample-credentials {
+      margin-top: 18px;
+      color: #606770;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .dashboard-card {
+      width: 100%;
+      max-width: 100%;
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+      padding: 26px;
+      margin-top: 24px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .top-bar h2 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    .top-bar p,
+    .top-bar span {
+      margin: 0;
+      color: #606770;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .badge.success {
+      background: #e6f4ea;
+      color: #166534;
+    }
+
+    .stats {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
+
+    .stat-item {
+      background: #f8fafc;
+      border-radius: 20px;
+      padding: 22px;
+      text-align: center;
+    }
+
+    .stat-item h3 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    .stat-item p {
+      margin: 12px 0 0;
+      color: #606770;
+    }
+
+    .attendance-form {
+      display: grid;
+      gap: 16px;
+      max-width: 420px;
+    }
+
+    .attendance-form label {
+      display: grid;
+      gap: 10px;
+      font-weight: 600;
+      color: #050505;
+      font-size: 0.95rem;
+    }
+
+    .attendance-form select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid #ccd0d5;
+      background: white;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      min-width: 320px;
+    }
+
+    th, td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    th {
+      color: #111827;
+      font-weight: 700;
+    }
+
+    footer {
+      text-align: center;
+      padding: 18px 24px;
+      color: #e4e6eb;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-panel,
+      .login-panel,
+      .dashboard-card {
+        width: 100%;
+      }
+
+      .hero-panel {
+        padding: 32px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 600px) {
+      body {
+        min-height: 100vh;
+        background: linear-gradient(180deg, #364fc7 0%, #15244f 100%);
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .layout {
+        width: 100%;
+      }
+
+      .hero-panel,
+      .login-card,
+      .dashboard-card {
+        padding: 20px;
+        border-radius: 24px;
+      }
+
+      .hero-panel {
+        background: rgba(255,255,255,0.10);
+        box-shadow: 0 18px 50px rgba(3, 10, 34, 0.18);
+      }
+
+      .login-card,
+      .dashboard-card {
+        background: rgba(255,255,255,0.97);
+        border: none;
+      }
+
+      .role-row {
+        grid-template-columns: 1fr;
+      }
+
+      .role-pill {
+        width: 100%;
+      }
+
+      .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .login-link-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .attendance-form,
+      .stats {
+        width: 100%;
+      }
+
+      .attendance-form label,
+      .attendance-form input,
+      .attendance-form select,
+      .actions button {
+        width: 100%;
+      }
+
+      table {
+        font-size: 0.9rem;
+      }
+
+      .hero-panel h1 {
+        font-size: 2.4rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="layout">
+      <section class="hero-panel">
+        <h1>Attendance for every team.</h1>
+        <p>Fast sign-in for employees, clear reporting for managers, and a clean workflow that feels familiar from the first visit.</p>
+        <div class="hero-features">
+          <div class="hero-feature">Secure employee and admin login.</div>
+          <div class="hero-feature">Modern dashboard for attendance insights.</div>
+          <div class="hero-feature">Built with a simple Facebook-style login experience.</div>
+        </div>
+      </section>
+
+      <section class="login-panel">
+        <div class="login-card" id="login-card">
+          <h2 id="login-title">Login</h2>
+          <p id="login-subtitle">Choose a login type, then sign in with your attendance credentials.</p>
+
+          <div class="role-row">
+            <button class="role-pill" id="employee-option" onclick="selectRole('employee')">Employee</button>
+            <button class="role-pill" id="admin-option" onclick="selectRole('admin')">Admin</button>
+          </div>
+
+          <div class="message info" id="role-hint">Select a role to continue.</div>
+
+          <label>
+            Email or phone
+            <input type="email" id="email" placeholder="user@example.com" />
+          </label>
+
+          <label>
+            Password
+            <input type="password" id="password" placeholder="Enter password" />
+          </label>
+
+          <div class="actions">
+            <button class="button-primary" onclick="login()">Log In</button>
+            <button class="button-secondary" onclick="fingerprintLogin()">Login with Fingerprint</button>
+          </div>
+
+          <div class="login-link-row">
+            <a href="#" onclick="event.preventDefault(); alert('Password reset not available in this demo.')">Forgot password?</a>
+            <span>Need access? Select Admin or Employee above.</span>
+          </div>
+
+          <p class="message error hidden" id="login-error">Invalid login. Try again or use a sample credential.</p>
+          <p class="message info hidden" id="login-message">Fingerprint login successful.</p>
+
+          <div class="sample-credentials" id="sample-credentials">
+            <strong>Employee login:</strong> employee1@example.com / password<br />
+            <strong>Admin login:</strong> admin@example.com / adminpass
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-card hidden" id="employee-dashboard">
+        <div class="top-bar">
+          <div>
+            <h2 id="employee-name">Employee Name</h2>
+            <span id="employee-email">email@example.com</span>
+          </div>
+          <button class="button-secondary" onclick="logoff()">Log Off</button>
+        </div>
+        <div id="employee-toast" class="badge success hidden" style="margin-bottom:16px;">Fingerprint login successful.</div>
+        <div class="stats">
+          <div class="stat-item">
+            <h3 id="days-present">0</h3>
+            <p>Days Present</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="days-absent">0</h3>
+            <p>Days Absent</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="total-hours">0h</h3>
+            <p>Total Hours</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="login-count">0</h3>
+            <p>Login Events</p>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Record Today's Attendance</h3>
+          <div class="attendance-form">
+            <label>
+              Date
+              <input type="date" id="attendance-date" />
+            </label>
+            <label>
+              Status
+              <select id="attendance-status">
+                <option value="Present">Present</option>
+                <option value="Late">Late</option>
+                <option value="Absent">Absent</option>
+              </select>
+            </label>
+            <button class="button-secondary" id="verify-location-btn" onclick="verifyLocation()">Verify Office Location</button>
+            <button class="button-primary" id="save-attendance-btn" onclick="saveAttendance()" disabled>Save Attendance</button>
+            <p id="location-status-msg" class="message info hidden">Please allow location access so we can verify you are in the office before recording attendance.</p>
+            <p id="attendance-status-msg" class="message info hidden">Attendance saved.</p>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Attendance History</h3>
+          <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr><th>Date</th><th>Status</th><th>Hours</th><th>Check-in</th><th>Check-out</th></tr>
+            </thead>
+            <tbody id="attendance-table"></tbody>
+          </table>
+        </div>
+        </div>
+      </section>
+
+      <section class="dashboard-card hidden" id="admin-dashboard">
+        <div class="top-bar">
+          <div>
+            <h2>Admin Dashboard</h2>
+            <p>View and manage all employee attendance data.</p>
+          </div>
+          <button class="button-secondary" onclick="logoff()">Log Off</button>
+        </div>
+        <div id="admin-toast" class="badge success hidden" style="margin-bottom:16px;">Fingerprint login successful.</div>
+        <div class="stats">
+          <div class="stat-item">
+            <h3 id="total-employees">0</h3>
+            <p>Employees</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="monthly-attendance">0%</h3>
+            <p>On-time attendance</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="total-hours-all">0h</h3>
+            <p>Total Hours Logged</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="late-total">0</h3>
+            <p>Total Late Arrivals</p>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Employee Attendance Overview</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Email</th><th>Present</th><th>Absent</th><th>Late</th><th>Total Hours</th></tr>
+              </thead>
+              <tbody id="admin-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>Static attendance demo for employee and admin access.</footer>
+
+  <script>
+    const roleData = {
+      employee: {
+        title: 'Employee Login',
+        subtitle: 'Enter your employee credentials or use fingerprint login.',
+      },
+      admin: {
+        title: 'Admin Login',
+        subtitle: 'Enter admin credentials or use fingerprint login.',
+      }
+    };
+
+    const firstNames = ['Alice','Bob','Clara','David','Eve','Frank','Grace','Helen','Isaac','Jade','Kyle','Lina','Mason','Nora','Omar','Paula','Quinn','Riley','Sara','Tom','Uma','Victor','Wendy','Xavier','Yara','Zane','Amy','Brad','Celia','Dylan'];
+    const lastNames = ['Johnson','Martinez','Lee','Brown','Davis','Garcia','Miller','Wilson','Taylor','Anderson','Thomas','Martin','Jackson','White','Harris','Clark','Lewis','Robinson','Walker','Perez','Hall','Young','Allen','Sanchez','Wright','King','Scott','Green','Baker'];
+
+    const employees = Array.from({ length: 30 }).map((_, index) => {
+      const id = index + 1;
+      const first = firstNames[index];
+      const last = lastNames[index];
+      const email = `employee${id}@example.com`;
+      return {
+        id,
+        name: `${first} ${last}`,
+        email,
+        password: 'password',
+        role: 'employee',
+        records: generateRecords(id),
+      };
+    });
+
+    const adminUser = {
+      email: 'admin@example.com',
+      password: 'adminpass',
+      name: 'Attendance Admin',
+      role: 'admin'
+    };
+
+    let selectedRole = null;
+    let currentUser = null;
+    let loginMethod = null;
+
+    function selectRole(role) {
+      selectedRole = role;
+      document.getElementById('login-title').textContent = roleData[role].title;
+      document.getElementById('login-subtitle').textContent = roleData[role].subtitle;
+      document.getElementById('role-hint').textContent = role === 'admin'
+        ? 'Admin role selected. Use admin@example.com / adminpass.'
+        : 'Employee role selected. Use employee1@example.com / password.';
+      document.getElementById('employee-option').classList.toggle('active', role === 'employee');
+      document.getElementById('admin-option').classList.toggle('active', role === 'admin');
+      document.getElementById('email').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('login-message').classList.add('hidden');
+      document.getElementById('attendance-status-msg').classList.add('hidden');
+      document.getElementById('sample-credentials').innerHTML = role === 'admin'
+        ? '<strong>Admin login:</strong> admin@example.com / adminpass'
+        : '<strong>Employee login:</strong> employee1@example.com / password';
+      document.getElementById('email').focus();
+    }
+
+    function createAttendanceRecord(date, status) {
+      const hours = status === 'Absent' ? 0 : status === 'Late' ? 7.5 : 8;
+      const checkIn = status === 'Absent'
+        ? '-'
+        : status === 'Late'
+          ? `09:${10 + Math.floor(Math.random() * 30)}`
+          : `09:${Math.floor(Math.random() * 10).toString().padStart(2,'0')}`;
+      const checkOut = status === 'Absent' ? '-' : `17:${Math.floor(Math.random() * 30).toString().padStart(2,'0')}`;
+      return { date, status, hours, checkIn, checkOut };
+    }
+
+    function generateRecords(id) {
+      const statuses = ['Present','Present','Late','Present','Absent'];
+      const records = [];
+      for (let day = 1; day <= 30; day++) {
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        const hours = status === 'Absent' ? 0 : 7.5 + Math.round(Math.random() * 20) / 10;
+        const checkIn = status === 'Absent' ? '-' : status === 'Late' ? `09:${10 + Math.floor(Math.random() * 30)}` : `09:${Math.floor(Math.random() * 10).toString().padStart(2,'0')}`;
+        const checkOut = status === 'Absent' ? '-' : `17:${Math.floor(Math.random() * 30).toString().padStart(2,'0')}`;
+        records.push({ date: `2026-07-${String(day).padStart(2,'0')}`, status, hours, checkIn, checkOut });
+      }
+      return records;
+    }
+
+    function login() {
+      const email = document.getElementById('email').value.trim().toLowerCase();
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+      let user = null;
+
+      loginMethod = 'credentials';
+      document.getElementById('login-message').style.display = 'none';
+
+      if (selectedRole === 'admin') {
+        if (email === adminUser.email && password === adminUser.password) {
+          user = adminUser;
+        }
+      } else {
+        user = employees.find(u => u.email === email && u.password === password);
+      }
+
+      if (!user) {
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      errorEl.classList.add('hidden');
+      currentUser = user;
+      locationVerified = false;
+      document.getElementById('location-status-msg').classList.add('hidden');
+      showDashboard();
+    }
+
+    let locationVerified = false;
+
+    function updateAttendanceButtonState() {
+      const saveBtn = document.getElementById('save-attendance-btn');
+      saveBtn.disabled = !locationVerified;
+    }
+
+    function verifyLocation() {
+      const statusMsg = document.getElementById('location-status-msg');
+      statusMsg.classList.add('hidden');
+      if (!navigator.geolocation) {
+        statusMsg.textContent = 'Geolocation is not supported in your browser.';
+        statusMsg.classList.remove('hidden');
+        return;
+      }
+
+      statusMsg.textContent = 'Checking location... please allow GPS access.';
+      statusMsg.classList.remove('hidden');
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const { latitude, longitude } = position.coords;
+          const inOffice = isInOfficeLocation(latitude, longitude);
+          if (inOffice) {
+            locationVerified = true;
+            statusMsg.textContent = 'Location verified in office. You can now save today\'s attendance.';
+            statusMsg.classList.remove('hidden');
+          } else {
+            locationVerified = false;
+            statusMsg.textContent = 'You are not in the office location. Move closer to the office and verify again.';
+            statusMsg.classList.remove('hidden');
+          }
+          updateAttendanceButtonState();
+        },
+        error => {
+          locationVerified = false;
+          updateAttendanceButtonState();
+          if (error.code === error.PERMISSION_DENIED) {
+            statusMsg.textContent = 'Location permission denied. Please allow location access to verify office presence.';
+          } else {
+            statusMsg.textContent = 'Unable to determine your location. Try again.';
+          }
+          statusMsg.classList.remove('hidden');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    function isInOfficeLocation(lat, lon) {
+      const officeLat = 12.8037483;
+      const officeLon = 80.2232878;
+      const allowedRadiusMeters = 500;
+      const toRad = value => value * Math.PI / 180;
+      const earthRadius = 6371000;
+      const dLat = toRad(officeLat - lat);
+      const dLon = toRad(officeLon - lon);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat)) * Math.cos(toRad(officeLat)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = earthRadius * c;
+      return distance <= allowedRadiusMeters;
+    }
+
+    function saveAttendance() {
+      if (!locationVerified) {
+        const statusMsg = document.getElementById('location-status-msg');
+        statusMsg.textContent = 'Please verify your office location before saving attendance.';
+        statusMsg.classList.remove('hidden');
+        return;
+      }
+      const dateValue = document.getElementById('attendance-date').value;
+      const status = document.getElementById('attendance-status').value;
+      const messageEl = document.getElementById('attendance-status-msg');
+      if (!dateValue || !status) {
+        messageEl.textContent = 'Please choose a date and attendance status.';
+        messageEl.classList.remove('hidden');
+        return;
+      }
+      const existing = currentUser.records.find(record => record.date === dateValue);
+      const newRecord = createAttendanceRecord(dateValue, status);
+      if (existing) {
+        Object.assign(existing, newRecord);
+        messageEl.textContent = `Attendance updated for ${dateValue}.`;
+      } else {
+        currentUser.records.unshift(newRecord);
+        messageEl.textContent = `Attendance saved for ${dateValue}.`;
+      }
+      messageEl.classList.remove('hidden');
+      renderEmployeeDashboard();
+    }
+
+    function fingerprintLogin() {
+      const errorEl = document.getElementById('login-error');
+      errorEl.classList.add('hidden');
+      loginMethod = 'fingerprint';
+      if (selectedRole === 'admin') {
+        currentUser = adminUser;
+      } else {
+        currentUser = employees[Math.floor(Math.random() * employees.length)];
+      }
+      document.getElementById('login-message').textContent = selectedRole === 'admin'
+        ? 'Fingerprint recognized admin access.'
+        : `Fingerprint recognized ${currentUser.name}.`;
+      document.getElementById('login-message').classList.remove('hidden');
+      showDashboard();
+    }
+
+    function showDashboard() {
+      document.getElementById('login-card').classList.add('hidden');
+      document.getElementById('employee-toast').classList.add('hidden');
+      document.getElementById('admin-toast').classList.add('hidden');
+      if (currentUser.role === 'admin') {
+        document.getElementById('employee-dashboard').classList.add('hidden');
+        document.getElementById('admin-dashboard').classList.remove('hidden');
+        renderAdminDashboard();
+        if (loginMethod === 'fingerprint') {
+          document.getElementById('admin-toast').textContent = 'Fingerprint login successful for admin.';
+          document.getElementById('admin-toast').classList.remove('hidden');
+        }
+      } else {
+        document.getElementById('admin-dashboard').classList.add('hidden');
+        document.getElementById('employee-dashboard').classList.remove('hidden');
+        renderEmployeeDashboard();
+        if (loginMethod === 'fingerprint') {
+          document.getElementById('employee-toast').textContent = `Fingerprint login successful for ${currentUser.name}.`;
+          document.getElementById('employee-toast').classList.remove('hidden');
+        }
+      }
+    }
+
+    function renderEmployeeDashboard() {
+      document.getElementById('employee-name').textContent = currentUser.name;
+      document.getElementById('employee-email').textContent = currentUser.email;
+      const records = currentUser.records;
+      const presentDays = records.filter(r => r.status === 'Present' || r.status === 'Late').length;
+      const absentDays = records.filter(r => r.status === 'Absent').length;
+      const totalHours = records.reduce((sum, r) => sum + r.hours, 0).toFixed(1);
+      const loginCount = records.filter(r => r.status !== 'Absent').length;
+      document.getElementById('days-present').textContent = presentDays;
+      document.getElementById('days-absent').textContent = absentDays;
+      document.getElementById('total-hours').textContent = totalHours + 'h';
+      document.getElementById('login-count').textContent = loginCount;
+      document.getElementById('attendance-table').innerHTML = records.map(r => `
+        <tr>
+          <td>${r.date}</td>
+          <td>${r.status}</td>
+          <td>${r.hours}</td>
+          <td>${r.checkIn}</td>
+          <td>${r.checkOut}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderAdminDashboard() {
+      document.getElementById('total-employees').textContent = employees.length;
+      const totalHours = employees.reduce((sum, emp) => sum + emp.records.reduce((rSum, r) => rSum + r.hours, 0), 0);
+      const totalLate = employees.reduce((sum, emp) => sum + emp.records.filter(r => r.status === 'Late').length, 0);
+      const totalPresent = employees.reduce((sum, emp) => sum + emp.records.filter(r => r.status === 'Present' || r.status === 'Late').length, 0);
+      const totalPossible = employees.length * employees[0].records.length;
+      const onTimePercent = ((totalPresent / totalPossible) * 100).toFixed(0);
+      document.getElementById('total-hours-all').textContent = totalHours.toFixed(1) + 'h';
+      document.getElementById('late-total').textContent = totalLate;
+      document.getElementById('monthly-attendance').textContent = onTimePercent + '%';
+      document.getElementById('admin-table').innerHTML = employees.map(emp => {
+        const presentCount = emp.records.filter(r => r.status === 'Present' || r.status === 'Late').length;
+        const absentCount = emp.records.filter(r => r.status === 'Absent').length;
+        const lateCount = emp.records.filter(r => r.status === 'Late').length;
+        const hours = emp.records.reduce((sum, r) => sum + r.hours, 0).toFixed(1);
+        return `
+          <tr>
+            <td>${emp.name}</td>
+            <td>${emp.email}</td>
+            <td>${presentCount}</td>
+            <td>${absentCount}</td>
+            <td>${lateCount}</td>
+            <td>${hours}h</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function logoff() {
+      currentUser = null;
+      loginMethod = null;
+      locationVerified = false;
+      resetToRole();
+      document.getElementById('login-message').classList.add('hidden');
+      document.getElementById('employee-toast').classList.add('hidden');
+      document.getElementById('admin-toast').classList.add('hidden');
+      document.getElementById('attendance-status-msg').classList.add('hidden');
+      document.getElementById('location-status-msg').classList.add('hidden');
+      updateAttendanceButtonState();
+    }
+
+    function resetToRole() {
+      selectedRole = null;
+      currentUser = null;
+      document.getElementById('login-card').classList.remove('hidden');
+      document.getElementById('employee-dashboard').classList.add('hidden');
+      document.getElementById('admin-dashboard').classList.add('hidden');
+      document.getElementById('login-title').textContent = 'Login';
+      document.getElementById('login-subtitle').textContent = 'Choose a login type, then sign in with your attendance credentials.';
+      document.getElementById('role-hint').textContent = 'Select a role to continue.';
+      document.getElementById('employee-option').classList.remove('active');
+      document.getElementById('admin-option').classList.remove('active');
+      document.getElementById('login-error').classList.add('hidden');
+      document.getElementById('login-message').classList.add('hidden');
+      document.getElementById('attendance-status-msg').classList.add('hidden');
+      document.getElementById('location-status-msg').classList.add('hidden');
+      document.getElementById('save-attendance-btn').disabled = true;
+      document.getElementById('sample-credentials').innerHTML = '<strong>Employee login:</strong> employee1@example.com / password<br /><strong>Admin login:</strong> admin@example.com / adminpass';
+    }
+
+    window.addEventListener('load', resetToRole);
+  </script>
+</body>
+</html>
