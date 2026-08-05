@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 from pydantic import BaseModel, EmailStr
 
 api_router = APIRouter()
@@ -58,6 +58,24 @@ class AdminEmployeeSummary(BaseModel):
     late: int
     hours: float
 
+class PermissionRequestModel(BaseModel):
+    id: int
+    email: EmailStr
+    name: str
+    type: str
+    date: str
+    time: str
+    status: str
+
+class CreatePermissionRequest(BaseModel):
+    email: EmailStr
+    type: str
+    date: str
+    time: str
+
+class UpdatePermissionRequest(BaseModel):
+    status: str
+
 admin_user = {
     'email': 'admin@example.com',
     'password': 'adminpass',
@@ -66,6 +84,8 @@ admin_user = {
 }
 
 employees = []
+permission_requests = []
+request_id_counter = 1
 
 
 def create_attendance_record(date: str, status: str) -> dict:
@@ -163,8 +183,21 @@ def save_attendance(payload: SaveAttendanceRequest):
     if not payload.date or not payload.status:
         raise HTTPException(status_code=400, detail='Date and status are required.')
 
+    approved_late = next((r for r in permission_requests if r['email'] == user['email'] and r['date'] == payload.date and r['type'] == 'Late Arrival' and r['status'] == 'Approved'), None)
+    approved_early = next((r for r in permission_requests if r['email'] == user['email'] and r['date'] == payload.date and r['type'] == 'Early Logoff' and r['status'] == 'Approved'), None)
+
+    final_status = payload.status
+    if payload.status == 'Late' and approved_late:
+        final_status = 'Present'
+
     existing = next((record for record in user['records'] if record['date'] == payload.date), None)
-    record = create_attendance_record(payload.date, payload.status)
+    record = create_attendance_record(payload.date, final_status)
+    
+    if approved_late:
+        record['checkIn'] = approved_late['time']
+    if approved_early:
+        record['checkOut'] = approved_early['time']
+
     if existing:
         existing.update(record)
     else:
@@ -201,3 +234,38 @@ def admin_dashboard():
         },
         'employees': employee_summaries,
     }
+
+@api_router.post('/permissions', response_model=PermissionRequestModel)
+def create_permission(payload: CreatePermissionRequest):
+    global request_id_counter
+    user = find_user(payload.email)
+    if not user:
+        raise HTTPException(status_code=404, detail='User not found')
+    req = {
+        'id': request_id_counter,
+        'email': user['email'],
+        'name': user['name'],
+        'type': payload.type,
+        'date': payload.date,
+        'time': payload.time,
+        'status': 'Pending'
+    }
+    request_id_counter += 1
+    permission_requests.append(req)
+    return req
+
+@api_router.get('/permissions', response_model=List[PermissionRequestModel])
+def get_permissions(email: EmailStr = Query(...)):
+    return [req for req in permission_requests if req['email'] == email.lower()]
+
+@api_router.get('/admin/permissions', response_model=List[PermissionRequestModel])
+def get_admin_permissions():
+    return permission_requests
+
+@api_router.put('/admin/permissions/{req_id}', response_model=PermissionRequestModel)
+def update_permission(req_id: int = Path(...), payload: UpdatePermissionRequest = None):
+    req = next((r for r in permission_requests if r['id'] == req_id), None)
+    if not req:
+        raise HTTPException(status_code=404, detail='Request not found')
+    req['status'] = payload.status
+    return req
