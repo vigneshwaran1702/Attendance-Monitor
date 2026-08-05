@@ -626,6 +626,8 @@
   <footer>Static attendance demo for employee and admin access.</footer>
 
   <script>
+    const apiBaseUrl = 'http://127.0.0.1:8000/api/v1';
+
     const roleData = {
       employee: {
         title: 'Employee Login',
@@ -637,33 +639,9 @@
       }
     };
 
-    const firstNames = ['Alice','Bob','Clara','David','Eve','Frank','Grace','Helen','Isaac','Jade','Kyle','Lina','Mason','Nora','Omar','Paula','Quinn','Riley','Sara','Tom','Uma','Victor','Wendy','Xavier','Yara','Zane','Amy','Brad','Celia','Dylan'];
-    const lastNames = ['Johnson','Martinez','Lee','Brown','Davis','Garcia','Miller','Wilson','Taylor','Anderson','Thomas','Martin','Jackson','White','Harris','Clark','Lewis','Robinson','Walker','Perez','Hall','Young','Allen','Sanchez','Wright','King','Scott','Green','Baker'];
-
-    const employees = Array.from({ length: 30 }).map((_, index) => {
-      const id = index + 1;
-      const first = firstNames[index];
-      const last = lastNames[index];
-      const email = `employee${id}@example.com`;
-      return {
-        id,
-        name: `${first} ${last}`,
-        email,
-        password: 'password',
-        role: 'employee',
-        records: generateRecords(id),
-      };
-    });
-
-    const adminUser = {
-      email: 'admin@example.com',
-      password: 'adminpass',
-      name: 'Attendance Admin',
-      role: 'admin'
-    };
-
     let selectedRole = null;
     let currentUser = null;
+    let adminDashboardData = null;
     let loginMethod = null;
 
     function selectRole(role) {
@@ -710,32 +688,48 @@
       return records;
     }
 
-    function login() {
+    async function login() {
       const email = document.getElementById('email').value.trim().toLowerCase();
       const password = document.getElementById('password').value;
       const errorEl = document.getElementById('login-error');
-      let user = null;
 
-      loginMethod = 'credentials';
-      document.getElementById('login-message').style.display = 'none';
-
-      if (selectedRole === 'admin') {
-        if (email === adminUser.email && password === adminUser.password) {
-          user = adminUser;
-        }
-      } else {
-        user = employees.find(u => u.email === email && u.password === password);
-      }
-
-      if (!user) {
+      if (!selectedRole) {
+        errorEl.textContent = 'Please select a role before logging in.';
         errorEl.classList.remove('hidden');
         return;
       }
-      errorEl.classList.add('hidden');
-      currentUser = user;
-      locationVerified = false;
-      document.getElementById('location-status-msg').classList.add('hidden');
-      showDashboard();
+
+      loginMethod = 'credentials';
+      document.getElementById('login-message').classList.add('hidden');
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, role: selectedRole }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          errorEl.textContent = error.detail || 'Invalid login. Try again.';
+          errorEl.classList.remove('hidden');
+          return;
+        }
+
+        const data = await response.json();
+        currentUser = data.user;
+        currentUser.token = data.token;
+        errorEl.classList.add('hidden');
+        locationVerified = false;
+        document.getElementById('location-status-msg').classList.add('hidden');
+        if (currentUser.role === 'admin') {
+          await loadAdminDashboard();
+        }
+        showDashboard();
+      } catch (err) {
+        errorEl.textContent = 'Unable to reach the backend. Ensure the server is running on port 8000.';
+        errorEl.classList.remove('hidden');
+      }
     }
 
     let locationVerified = false;
@@ -802,7 +796,7 @@
       return distance <= allowedRadiusMeters;
     }
 
-    function saveAttendance() {
+    async function saveAttendance() {
       if (!locationVerified) {
         const statusMsg = document.getElementById('location-status-msg');
         statusMsg.textContent = 'Please verify your office location before saving attendance.';
@@ -817,33 +811,72 @@
         messageEl.classList.remove('hidden');
         return;
       }
-      const existing = currentUser.records.find(record => record.date === dateValue);
-      const newRecord = createAttendanceRecord(dateValue, status);
-      if (existing) {
-        Object.assign(existing, newRecord);
-        messageEl.textContent = `Attendance updated for ${dateValue}.`;
-      } else {
-        currentUser.records.unshift(newRecord);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/attendance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentUser.email, date: dateValue, status }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          messageEl.textContent = error.detail || 'Unable to save attendance.';
+          messageEl.classList.remove('hidden');
+          return;
+        }
+
+        const records = await response.json();
+        currentUser.records = records;
         messageEl.textContent = `Attendance saved for ${dateValue}.`;
+        messageEl.classList.remove('hidden');
+        renderEmployeeDashboard();
+      } catch (err) {
+        messageEl.textContent = 'Unable to reach the backend. Ensure the server is running on port 8000.';
+        messageEl.classList.remove('hidden');
       }
-      messageEl.classList.remove('hidden');
-      renderEmployeeDashboard();
     }
 
-    function fingerprintLogin() {
+    async function fingerprintLogin() {
       const errorEl = document.getElementById('login-error');
       errorEl.classList.add('hidden');
       loginMethod = 'fingerprint';
-      if (selectedRole === 'admin') {
-        currentUser = adminUser;
-      } else {
-        currentUser = employees[Math.floor(Math.random() * employees.length)];
+
+      const email = selectedRole === 'admin'
+        ? 'admin@example.com'
+        : 'employee1@example.com';
+      const password = selectedRole === 'admin' ? 'adminpass' : 'password';
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, role: selectedRole }),
+        });
+
+        if (!response.ok) {
+          errorEl.textContent = 'Fingerprint login failed. Please try normal login.';
+          errorEl.classList.remove('hidden');
+          return;
+        }
+
+        const data = await response.json();
+        currentUser = data.user;
+        currentUser.token = data.token;
+        document.getElementById('login-message').textContent = selectedRole === 'admin'
+          ? 'Fingerprint recognized admin access.'
+          : `Fingerprint recognized ${currentUser.name}.`;
+        document.getElementById('login-message').classList.remove('hidden');
+        locationVerified = false;
+        document.getElementById('location-status-msg').classList.add('hidden');
+        if (currentUser.role === 'admin') {
+          await loadAdminDashboard();
+        }
+        showDashboard();
+      } catch (err) {
+        errorEl.textContent = 'Unable to reach the backend. Ensure the server is running on port 8000.';
+        errorEl.classList.remove('hidden');
       }
-      document.getElementById('login-message').textContent = selectedRole === 'admin'
-        ? 'Fingerprint recognized admin access.'
-        : `Fingerprint recognized ${currentUser.name}.`;
-      document.getElementById('login-message').classList.remove('hidden');
-      showDashboard();
     }
 
     function showDashboard() {
@@ -893,31 +926,42 @@
     }
 
     function renderAdminDashboard() {
-      document.getElementById('total-employees').textContent = employees.length;
-      const totalHours = employees.reduce((sum, emp) => sum + emp.records.reduce((rSum, r) => rSum + r.hours, 0), 0);
-      const totalLate = employees.reduce((sum, emp) => sum + emp.records.filter(r => r.status === 'Late').length, 0);
-      const totalPresent = employees.reduce((sum, emp) => sum + emp.records.filter(r => r.status === 'Present' || r.status === 'Late').length, 0);
-      const totalPossible = employees.length * employees[0].records.length;
-      const onTimePercent = ((totalPresent / totalPossible) * 100).toFixed(0);
-      document.getElementById('total-hours-all').textContent = totalHours.toFixed(1) + 'h';
-      document.getElementById('late-total').textContent = totalLate;
-      document.getElementById('monthly-attendance').textContent = onTimePercent + '%';
-      document.getElementById('admin-table').innerHTML = employees.map(emp => {
-        const presentCount = emp.records.filter(r => r.status === 'Present' || r.status === 'Late').length;
-        const absentCount = emp.records.filter(r => r.status === 'Absent').length;
-        const lateCount = emp.records.filter(r => r.status === 'Late').length;
-        const hours = emp.records.reduce((sum, r) => sum + r.hours, 0).toFixed(1);
-        return `
-          <tr>
-            <td>${emp.name}</td>
-            <td>${emp.email}</td>
-            <td>${presentCount}</td>
-            <td>${absentCount}</td>
-            <td>${lateCount}</td>
-            <td>${hours}h</td>
-          </tr>
-        `;
-      }).join('');
+      if (!adminDashboardData) {
+        document.getElementById('total-employees').textContent = '0';
+        document.getElementById('monthly-attendance').textContent = '0%';
+        document.getElementById('total-hours-all').textContent = '0h';
+        document.getElementById('late-total').textContent = '0';
+        document.getElementById('admin-table').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('total-employees').textContent = adminDashboardData.summary.employees;
+      document.getElementById('monthly-attendance').textContent = `${adminDashboardData.summary.onTimeRate}%`;
+      document.getElementById('total-hours-all').textContent = `${adminDashboardData.summary.totalHours.toFixed(1)}h`;
+      document.getElementById('late-total').textContent = adminDashboardData.summary.totalLate;
+      document.getElementById('admin-table').innerHTML = adminDashboardData.employees.map(emp => `
+        <tr>
+          <td>${emp.name}</td>
+          <td>${emp.email}</td>
+          <td>${emp.present}</td>
+          <td>${emp.absent}</td>
+          <td>${emp.late}</td>
+          <td>${emp.hours.toFixed(1)}h</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadAdminDashboard() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/dashboard`);
+        if (!response.ok) {
+          adminDashboardData = null;
+          return;
+        }
+        adminDashboardData = await response.json();
+      } catch (err) {
+        adminDashboardData = null;
+      }
     }
 
     function logoff() {

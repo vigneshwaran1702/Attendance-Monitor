@@ -1,5 +1,8 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from app.core.config.config import settings
 from app.api.v1.api import api_router
 
@@ -21,4 +24,6 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to the Attendance System API"}
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+    index_path = os.path.join(root_dir, 'index.html')
+    return FileResponse(index_path)

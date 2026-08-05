@@ -1,12 +1,23 @@
 import logging
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
+import os
+import sys
+try:
+    from sqlalchemy import engine_from_config
+except ImportError:
+    from sqlalchemy.engine import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# add project root to PYTHONPATH so imports work when running Alembic
+script_location = os.path.dirname(os.path.realpath(__file__))
+project_root = os.path.abspath(os.path.join(script_location, ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

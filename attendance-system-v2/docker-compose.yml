@@ -24,7 +24,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=attendance_db
-      - SECRET_KEY=YOUR_PRODUCTION_SECRET_KEY
+      - SECRET_KEY=a9e3884ffb6b4c9aa07d3f6d503b6424f2cb5a34db2f4c21a77d5c68a9c5b8e1
     ports:
       - "8000:8000"
     depends_on:

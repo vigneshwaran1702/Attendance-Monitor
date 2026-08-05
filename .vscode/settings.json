@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\attendance-system-v2\\backend\\venv\\Scripts\\python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}\\attendance-system-v2\\backend\\src"
+  ],
+  "python.analysis.packageIndexDepths": {
+    "sqlalchemy": 2
+  }
+}
