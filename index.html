@@ -579,6 +579,38 @@
           </table>
         </div>
         </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Permission Requests</h3>
+          <div class="attendance-form" style="max-width: 100%;">
+            <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+              <label>
+                Type
+                <select id="perm-type">
+                  <option value="Late Arrival">Late Arrival</option>
+                  <option value="Early Logoff">Early Logoff</option>
+                </select>
+              </label>
+              <label>
+                Date
+                <input type="date" id="perm-date" />
+              </label>
+              <label>
+                Time
+                <input type="time" id="perm-time" />
+              </label>
+            </div>
+            <button class="button-primary" style="margin-top:10px; width: fit-content;" onclick="submitPermission()">Submit Request</button>
+            <p id="perm-status-msg" class="message info hidden">Request submitted successfully.</p>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Type</th><th>Time</th><th>Status</th></tr>
+              </thead>
+              <tbody id="perm-table"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <section class="dashboard-card hidden" id="admin-dashboard">
@@ -619,6 +651,17 @@
             </table>
           </div>
         </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Pending Permissions</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Employee</th><th>Type</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="admin-perm-table"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </div>
   </main>
@@ -626,7 +669,7 @@
   <footer>Static attendance demo for employee and admin access.</footer>
 
   <script>
-    const apiBaseUrl = 'http://127.0.0.1:8000/api/v1';
+    const apiBaseUrl = '/api/v1';
 
     const roleData = {
       employee: {
@@ -923,6 +966,7 @@
           <td>${r.checkOut}</td>
         </tr>
       `).join('');
+      loadEmployeePermissions();
     }
 
     function renderAdminDashboard() {
@@ -962,6 +1006,90 @@
       } catch (err) {
         adminDashboardData = null;
       }
+      loadAdminPermissions();
+    }
+
+    async function loadAdminPermissions() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/permissions`);
+        if (response.ok) {
+          const perms = await response.json();
+          document.getElementById('admin-perm-table').innerHTML = perms.map(p => `
+            <tr>
+              <td>${p.name}<br><small>${p.email}</small></td>
+              <td>${p.type}</td>
+              <td>${p.date}</td>
+              <td>${p.time}</td>
+              <td>${p.status}</td>
+              <td>
+                ${p.status === 'Pending' ? `
+                  <button class="button-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updatePermissionStatus(${p.id}, 'Approved')">Approve</button>
+                  <button class="button-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updatePermissionStatus(${p.id}, 'Denied')">Deny</button>
+                ` : '-'}
+              </td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) { }
+    }
+
+    async function updatePermissionStatus(reqId, status) {
+      try {
+        await fetch(`${apiBaseUrl}/admin/permissions/${reqId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        loadAdminPermissions();
+      } catch (err) { }
+    }
+
+    async function loadEmployeePermissions() {
+      if (!currentUser) return;
+      try {
+        const response = await fetch(`${apiBaseUrl}/permissions?email=${currentUser.email}`);
+        if (response.ok) {
+          const perms = await response.json();
+          document.getElementById('perm-table').innerHTML = perms.map(p => `
+            <tr>
+              <td>${p.date}</td>
+              <td>${p.type}</td>
+              <td>${p.time}</td>
+              <td>${p.status}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) { }
+    }
+
+    async function submitPermission() {
+      const type = document.getElementById('perm-type').value;
+      const date = document.getElementById('perm-date').value;
+      const time = document.getElementById('perm-time').value;
+      const msgEl = document.getElementById('perm-status-msg');
+      if (!date || !time) {
+        msgEl.textContent = 'Please select date and time.';
+        msgEl.classList.remove('hidden');
+        return;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/permissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: currentUser.email, type, date, time }),
+        });
+        if (response.ok) {
+          msgEl.textContent = 'Request submitted successfully.';
+          msgEl.classList.remove('hidden');
+          loadEmployeePermissions();
+        } else {
+          msgEl.textContent = 'Error submitting request.';
+          msgEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        msgEl.textContent = 'Unable to reach the backend.';
+        msgEl.classList.remove('hidden');
+      }
     }
 
     function logoff() {
@@ -992,6 +1120,7 @@
       document.getElementById('login-message').classList.add('hidden');
       document.getElementById('attendance-status-msg').classList.add('hidden');
       document.getElementById('location-status-msg').classList.add('hidden');
+      document.getElementById('perm-status-msg')?.classList.add('hidden');
       document.getElementById('save-attendance-btn').disabled = true;
       document.getElementById('sample-credentials').innerHTML = '<strong>Employee login:</strong> employee1@example.com / password<br /><strong>Admin login:</strong> admin@example.com / adminpass';
     }
