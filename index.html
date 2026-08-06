@@ -301,6 +301,36 @@
       color: #166534;
     }
 
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 92px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .status-pill.status-approved,
+    .status-pill.status-accepted {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .status-pill.status-denied,
+    .status-pill.status-rejected {
+      background: #fdecea;
+      color: #c62828;
+    }
+
+    .status-pill.status-pending {
+      background: #fff4e5;
+      color: #b26a00;
+    }
+
     .stats {
       display: grid;
       gap: 18px;
@@ -652,6 +682,24 @@
           </div>
         </div>
         <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>View Attendance History for a Specific Employee</h3>
+          <div class="attendance-form" style="display: grid; gap: 16px; grid-template-columns: 1fr auto; align-items: end;">
+            <label style="width: 100%;">
+              Select Employee
+              <select id="admin-user-select" style="width: 100%;"></select>
+            </label>
+            <button class="button-primary" style="min-width: 160px;" onclick="loadSelectedUserHistory()">View History</button>
+          </div>
+          <div class="table-wrapper" style="margin-top: 16px;">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Hours</th><th>Check-in</th><th>Check-out</th></tr>
+              </thead>
+              <tbody id="admin-user-history-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
           <h3>Pending Permissions</h3>
           <div class="table-wrapper">
             <table>
@@ -686,6 +734,17 @@
     let currentUser = null;
     let adminDashboardData = null;
     let loginMethod = null;
+
+    function getPermissionStatusClass(status) {
+      const normalized = `${status || ''}`.toLowerCase();
+      if (normalized.includes('approve') || normalized.includes('accept')) {
+        return 'status-approved';
+      }
+      if (normalized.includes('deny') || normalized.includes('reject')) {
+        return 'status-denied';
+      }
+      return 'status-pending';
+    }
 
     function selectRole(role) {
       selectedRole = role;
@@ -824,8 +883,8 @@
     }
 
     function isInOfficeLocation(lat, lon) {
-      const officeLat = 12.8037483;
-      const officeLon = 80.2232878;
+      const officeLat = 13.0002923;
+      const officeLon = 80.2179616;
       const allowedRadiusMeters = 500;
       const toRad = value => value * Math.PI / 180;
       const earthRadius = 6371000;
@@ -1006,7 +1065,47 @@
       } catch (err) {
         adminDashboardData = null;
       }
+      fillAdminUserSelect();
       loadAdminPermissions();
+    }
+
+    function fillAdminUserSelect() {
+      const select = document.getElementById('admin-user-select');
+      if (!adminDashboardData?.employees) {
+        select.innerHTML = '<option value="">No employees available</option>';
+        return;
+      }
+      select.innerHTML = `<option value="">Select an employee</option>` + adminDashboardData.employees.map(emp => `
+        <option value="${emp.email}">${emp.name} (${emp.email})</option>
+      `).join('');
+    }
+
+    async function loadSelectedUserHistory() {
+      const select = document.getElementById('admin-user-select');
+      const email = select.value;
+      if (!email) {
+        alert('Please select an employee to view history.');
+        return;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/user-history?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+          alert('Unable to load user history.');
+          return;
+        }
+        const records = await response.json();
+        document.getElementById('admin-user-history-table').innerHTML = records.map(r => `
+          <tr>
+            <td>${r.date}</td>
+            <td>${r.status}</td>
+            <td>${r.hours}</td>
+            <td>${r.checkIn}</td>
+            <td>${r.checkOut}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        alert('Unable to reach the backend.');
+      }
     }
 
     async function loadAdminPermissions() {
@@ -1020,7 +1119,7 @@
               <td>${p.type}</td>
               <td>${p.date}</td>
               <td>${p.time}</td>
-              <td>${p.status}</td>
+              <td><span class="status-pill ${getPermissionStatusClass(p.status)}">${p.status}</span></td>
               <td>
                 ${p.status === 'Pending' ? `
                   <button class="button-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updatePermissionStatus(${p.id}, 'Approved')">Approve</button>
@@ -1055,7 +1154,7 @@
               <td>${p.date}</td>
               <td>${p.type}</td>
               <td>${p.time}</td>
-              <td>${p.status}</td>
+              <td><span class="status-pill ${getPermissionStatusClass(p.status)}">${p.status}</span></td>
             </tr>
           `).join('');
         }

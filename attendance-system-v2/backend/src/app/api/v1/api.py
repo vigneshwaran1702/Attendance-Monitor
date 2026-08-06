@@ -235,6 +235,13 @@ def admin_dashboard():
         'employees': employee_summaries,
     }
 
+@api_router.get('/admin/user-history', response_model=List[AttendanceRecord])
+def admin_user_history(email: EmailStr = Query(...)):
+    user = find_user(email)
+    if not user or user['role'] != 'employee':
+        raise HTTPException(status_code=404, detail='Employee not found.')
+    return user['records']
+
 @api_router.post('/permissions', response_model=PermissionRequestModel)
 def create_permission(payload: CreatePermissionRequest):
     global request_id_counter
