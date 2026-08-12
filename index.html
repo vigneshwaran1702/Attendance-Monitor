@@ -502,7 +502,7 @@
         <h1>Attendance for every team.</h1>
         <p>Fast sign-in for employees, clear reporting for managers, and a clean workflow that feels familiar from the first visit.</p>
         <div class="hero-features">
-          <div class="hero-feature">Secure employee and admin login.</div>
+          <div class="hero-feature">Secure employee, admin, and HR login.</div>
           <div class="hero-feature">Modern dashboard for attendance insights.</div>
           <div class="hero-feature">Built with a simple Facebook-style login experience.</div>
         </div>
@@ -516,6 +516,7 @@
           <div class="role-row">
             <button class="role-pill" id="employee-option" onclick="selectRole('employee')">Employee</button>
             <button class="role-pill" id="admin-option" onclick="selectRole('admin')">Admin</button>
+            <button class="role-pill" id="hr-option" onclick="selectRole('hr')">HR</button>
           </div>
 
           <div class="message info" id="role-hint">Select a role to continue.</div>
@@ -537,7 +538,7 @@
 
           <div class="login-link-row">
             <a href="#" onclick="event.preventDefault(); alert('Password reset not available in this demo.')">Forgot password?</a>
-            <span>Need access? Select Admin or Employee above.</span>
+            <span>Need access? Select Admin, HR, or Employee above.</span>
           </div>
 
           <p class="message error hidden" id="login-error">Invalid login. Try again or use a sample credential.</p>
@@ -545,7 +546,8 @@
 
           <div class="sample-credentials" id="sample-credentials">
             <strong>Employee login:</strong> employee1@example.com / password<br />
-            <strong>Admin login:</strong> admin@example.com / adminpass
+            <strong>Admin login:</strong> admin@example.com / adminpass<br />
+            <strong>HR login:</strong> hr@example.com / hrpass
           </div>
         </div>
       </section>
@@ -711,10 +713,79 @@
           </div>
         </div>
       </section>
+
+      <section class="dashboard-card hidden" id="hr-dashboard">
+        <div class="top-bar">
+          <div>
+            <h2>HR Portal</h2>
+            <p>Review attendance history and approve or deny employee permission requests.</p>
+          </div>
+          <button class="button-secondary" onclick="logoff()">Log Off</button>
+        </div>
+        <div id="hr-toast" class="badge success hidden" style="margin-bottom:16px;">Fingerprint login successful.</div>
+        <div class="stats">
+          <div class="stat-item">
+            <h3 id="hr-total-employees">0</h3>
+            <p>Employees</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="hr-monthly-attendance">0%</h3>
+            <p>On-time attendance</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="hr-total-hours-all">0h</h3>
+            <p>Total Hours Logged</p>
+          </div>
+          <div class="stat-item">
+            <h3 id="hr-late-total">0</h3>
+            <p>Total Late Arrivals</p>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Employee Attendance Overview</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Name</th><th>Email</th><th>Present</th><th>Absent</th><th>Late</th><th>Total Hours</th></tr>
+              </thead>
+              <tbody id="hr-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>View Attendance History for a Specific Employee</h3>
+          <div class="attendance-form" style="display: grid; gap: 16px; grid-template-columns: 1fr auto; align-items: end;">
+            <label style="width: 100%;">
+              Select Employee
+              <select id="hr-user-select" style="width: 100%;"></select>
+            </label>
+            <button class="button-primary" style="min-width: 160px;" onclick="loadSelectedHrUserHistory()">View History</button>
+          </div>
+          <div class="table-wrapper" style="margin-top: 16px;">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Status</th><th>Hours</th><th>Check-in</th><th>Check-out</th></tr>
+              </thead>
+              <tbody id="hr-user-history-table"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dashboard-card" style="margin-top:24px; padding:24px;">
+          <h3>Pending Permissions</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>Employee</th><th>Type</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="hr-perm-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
-  <footer>Static attendance demo for employee and admin access.</footer>
+  <footer>Static attendance demo for employee, admin, and HR access.</footer>
 
   <script>
     const apiBaseUrl = '/api/v1';
@@ -727,12 +798,17 @@
       admin: {
         title: 'Admin Login',
         subtitle: 'Enter admin credentials or use fingerprint login.',
+      },
+      hr: {
+        title: 'HR Login',
+        subtitle: 'Enter HR credentials or use fingerprint login.',
       }
     };
 
     let selectedRole = null;
     let currentUser = null;
     let adminDashboardData = null;
+    let hrDashboardData = null;
     let loginMethod = null;
 
     function getPermissionStatusClass(status) {
@@ -752,9 +828,12 @@
       document.getElementById('login-subtitle').textContent = roleData[role].subtitle;
       document.getElementById('role-hint').textContent = role === 'admin'
         ? 'Admin role selected. Use admin@example.com / adminpass.'
-        : 'Employee role selected. Use employee1@example.com / password.';
+        : role === 'hr'
+          ? 'HR role selected. Use hr@example.com / hrpass.'
+          : 'Employee role selected. Use employee1@example.com / password.';
       document.getElementById('employee-option').classList.toggle('active', role === 'employee');
       document.getElementById('admin-option').classList.toggle('active', role === 'admin');
+      document.getElementById('hr-option').classList.toggle('active', role === 'hr');
       document.getElementById('email').value = '';
       document.getElementById('password').value = '';
       document.getElementById('login-error').classList.add('hidden');
@@ -762,7 +841,9 @@
       document.getElementById('attendance-status-msg').classList.add('hidden');
       document.getElementById('sample-credentials').innerHTML = role === 'admin'
         ? '<strong>Admin login:</strong> admin@example.com / adminpass'
-        : '<strong>Employee login:</strong> employee1@example.com / password';
+        : role === 'hr'
+          ? '<strong>HR login:</strong> hr@example.com / hrpass'
+          : '<strong>Employee login:</strong> employee1@example.com / password';
       document.getElementById('email').focus();
     }
 
@@ -826,6 +907,8 @@
         document.getElementById('location-status-msg').classList.add('hidden');
         if (currentUser.role === 'admin') {
           await loadAdminDashboard();
+        } else if (currentUser.role === 'hr') {
+          await loadHrDashboard();
         }
         showDashboard();
       } catch (err) {
@@ -946,8 +1029,10 @@
 
       const email = selectedRole === 'admin'
         ? 'admin@example.com'
-        : 'employee1@example.com';
-      const password = selectedRole === 'admin' ? 'adminpass' : 'password';
+        : selectedRole === 'hr'
+          ? 'hr@example.com'
+          : 'employee1@example.com';
+      const password = selectedRole === 'admin' ? 'adminpass' : selectedRole === 'hr' ? 'hrpass' : 'password';
 
       try {
         const response = await fetch(`${apiBaseUrl}/auth/login`, {
@@ -967,12 +1052,16 @@
         currentUser.token = data.token;
         document.getElementById('login-message').textContent = selectedRole === 'admin'
           ? 'Fingerprint recognized admin access.'
-          : `Fingerprint recognized ${currentUser.name}.`;
+          : selectedRole === 'hr'
+            ? 'Fingerprint recognized HR access.'
+            : `Fingerprint recognized ${currentUser.name}.`;
         document.getElementById('login-message').classList.remove('hidden');
         locationVerified = false;
         document.getElementById('location-status-msg').classList.add('hidden');
         if (currentUser.role === 'admin') {
           await loadAdminDashboard();
+        } else if (currentUser.role === 'hr') {
+          await loadHrDashboard();
         }
         showDashboard();
       } catch (err) {
@@ -985,16 +1074,28 @@
       document.getElementById('login-card').classList.add('hidden');
       document.getElementById('employee-toast').classList.add('hidden');
       document.getElementById('admin-toast').classList.add('hidden');
+      document.getElementById('hr-toast').classList.add('hidden');
       if (currentUser.role === 'admin') {
         document.getElementById('employee-dashboard').classList.add('hidden');
+        document.getElementById('hr-dashboard').classList.add('hidden');
         document.getElementById('admin-dashboard').classList.remove('hidden');
         renderAdminDashboard();
         if (loginMethod === 'fingerprint') {
           document.getElementById('admin-toast').textContent = 'Fingerprint login successful for admin.';
           document.getElementById('admin-toast').classList.remove('hidden');
         }
+      } else if (currentUser.role === 'hr') {
+        document.getElementById('employee-dashboard').classList.add('hidden');
+        document.getElementById('admin-dashboard').classList.add('hidden');
+        document.getElementById('hr-dashboard').classList.remove('hidden');
+        renderHrDashboard();
+        if (loginMethod === 'fingerprint') {
+          document.getElementById('hr-toast').textContent = 'Fingerprint login successful for HR.';
+          document.getElementById('hr-toast').classList.remove('hidden');
+        }
       } else {
         document.getElementById('admin-dashboard').classList.add('hidden');
+        document.getElementById('hr-dashboard').classList.add('hidden');
         document.getElementById('employee-dashboard').classList.remove('hidden');
         renderEmployeeDashboard();
         if (loginMethod === 'fingerprint') {
@@ -1054,6 +1155,32 @@
       `).join('');
     }
 
+    function renderHrDashboard() {
+      if (!hrDashboardData) {
+        document.getElementById('hr-total-employees').textContent = '0';
+        document.getElementById('hr-monthly-attendance').textContent = '0%';
+        document.getElementById('hr-total-hours-all').textContent = '0h';
+        document.getElementById('hr-late-total').textContent = '0';
+        document.getElementById('hr-table').innerHTML = '';
+        return;
+      }
+
+      document.getElementById('hr-total-employees').textContent = hrDashboardData.summary.employees;
+      document.getElementById('hr-monthly-attendance').textContent = `${hrDashboardData.summary.onTimeRate}%`;
+      document.getElementById('hr-total-hours-all').textContent = `${hrDashboardData.summary.totalHours.toFixed(1)}h`;
+      document.getElementById('hr-late-total').textContent = hrDashboardData.summary.totalLate;
+      document.getElementById('hr-table').innerHTML = hrDashboardData.employees.map(emp => `
+        <tr>
+          <td>${emp.name}</td>
+          <td>${emp.email}</td>
+          <td>${emp.present}</td>
+          <td>${emp.absent}</td>
+          <td>${emp.late}</td>
+          <td>${emp.hours.toFixed(1)}h</td>
+        </tr>
+      `).join('');
+    }
+
     async function loadAdminDashboard() {
       try {
         const response = await fetch(`${apiBaseUrl}/admin/dashboard`);
@@ -1069,6 +1196,21 @@
       loadAdminPermissions();
     }
 
+    async function loadHrDashboard() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/hr/dashboard`);
+        if (!response.ok) {
+          hrDashboardData = null;
+          return;
+        }
+        hrDashboardData = await response.json();
+      } catch (err) {
+        hrDashboardData = null;
+      }
+      fillHrUserSelect();
+      loadHrPermissions();
+    }
+
     function fillAdminUserSelect() {
       const select = document.getElementById('admin-user-select');
       if (!adminDashboardData?.employees) {
@@ -1076,6 +1218,17 @@
         return;
       }
       select.innerHTML = `<option value="">Select an employee</option>` + adminDashboardData.employees.map(emp => `
+        <option value="${emp.email}">${emp.name} (${emp.email})</option>
+      `).join('');
+    }
+
+    function fillHrUserSelect() {
+      const select = document.getElementById('hr-user-select');
+      if (!hrDashboardData?.employees) {
+        select.innerHTML = '<option value="">No employees available</option>';
+        return;
+      }
+      select.innerHTML = `<option value="">Select an employee</option>` + hrDashboardData.employees.map(emp => `
         <option value="${emp.email}">${emp.name} (${emp.email})</option>
       `).join('');
     }
@@ -1120,10 +1273,57 @@
               <td>${p.date}</td>
               <td>${p.time}</td>
               <td><span class="status-pill ${getPermissionStatusClass(p.status)}">${p.status}</span></td>
+              <td>${p.status === 'Pending' ? 'Pending review' : '-'}</td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) { }
+    }
+
+    async function loadSelectedHrUserHistory() {
+      const select = document.getElementById('hr-user-select');
+      const email = select.value;
+      if (!email) {
+        alert('Please select an employee to view history.');
+        return;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/hr/user-history?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+          alert('Unable to load user history.');
+          return;
+        }
+        const records = await response.json();
+        document.getElementById('hr-user-history-table').innerHTML = records.map(r => `
+          <tr>
+            <td>${r.date}</td>
+            <td>${r.status}</td>
+            <td>${r.hours}</td>
+            <td>${r.checkIn}</td>
+            <td>${r.checkOut}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        alert('Unable to reach the backend.');
+      }
+    }
+
+    async function loadHrPermissions() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/hr/permissions`);
+        if (response.ok) {
+          const perms = await response.json();
+          document.getElementById('hr-perm-table').innerHTML = perms.map(p => `
+            <tr>
+              <td>${p.name}<br><small>${p.email}</small></td>
+              <td>${p.type}</td>
+              <td>${p.date}</td>
+              <td>${p.time}</td>
+              <td><span class="status-pill ${getPermissionStatusClass(p.status)}">${p.status}</span></td>
               <td>
                 ${p.status === 'Pending' ? `
-                  <button class="button-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updatePermissionStatus(${p.id}, 'Approved')">Approve</button>
-                  <button class="button-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updatePermissionStatus(${p.id}, 'Denied')">Deny</button>
+                  <button class="button-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updateHrPermissionStatus(${p.id}, 'Approved')">Approve</button>
+                  <button class="button-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="updateHrPermissionStatus(${p.id}, 'Denied')">Deny</button>
                 ` : '-'}
               </td>
             </tr>
@@ -1132,14 +1332,14 @@
       } catch (err) { }
     }
 
-    async function updatePermissionStatus(reqId, status) {
+    async function updateHrPermissionStatus(reqId, status) {
       try {
-        await fetch(`${apiBaseUrl}/admin/permissions/${reqId}`, {
+        await fetch(`${apiBaseUrl}/hr/permissions/${reqId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status }),
         });
-        loadAdminPermissions();
+        loadHrPermissions();
       } catch (err) { }
     }
 
@@ -1199,6 +1399,7 @@
       document.getElementById('login-message').classList.add('hidden');
       document.getElementById('employee-toast').classList.add('hidden');
       document.getElementById('admin-toast').classList.add('hidden');
+      document.getElementById('hr-toast').classList.add('hidden');
       document.getElementById('attendance-status-msg').classList.add('hidden');
       document.getElementById('location-status-msg').classList.add('hidden');
       updateAttendanceButtonState();
@@ -1210,18 +1411,20 @@
       document.getElementById('login-card').classList.remove('hidden');
       document.getElementById('employee-dashboard').classList.add('hidden');
       document.getElementById('admin-dashboard').classList.add('hidden');
+      document.getElementById('hr-dashboard').classList.add('hidden');
       document.getElementById('login-title').textContent = 'Login';
       document.getElementById('login-subtitle').textContent = 'Choose a login type, then sign in with your attendance credentials.';
       document.getElementById('role-hint').textContent = 'Select a role to continue.';
       document.getElementById('employee-option').classList.remove('active');
       document.getElementById('admin-option').classList.remove('active');
+      document.getElementById('hr-option').classList.remove('active');
       document.getElementById('login-error').classList.add('hidden');
       document.getElementById('login-message').classList.add('hidden');
       document.getElementById('attendance-status-msg').classList.add('hidden');
       document.getElementById('location-status-msg').classList.add('hidden');
       document.getElementById('perm-status-msg')?.classList.add('hidden');
       document.getElementById('save-attendance-btn').disabled = true;
-      document.getElementById('sample-credentials').innerHTML = '<strong>Employee login:</strong> employee1@example.com / password<br /><strong>Admin login:</strong> admin@example.com / adminpass';
+      document.getElementById('sample-credentials').innerHTML = '<strong>Employee login:</strong> employee1@example.com / password<br /><strong>Admin login:</strong> admin@example.com / adminpass<br /><strong>HR login:</strong> hr@example.com / hrpass';
     }
 
     window.addEventListener('load', resetToRole);

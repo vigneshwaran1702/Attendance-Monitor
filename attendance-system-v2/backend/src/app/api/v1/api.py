@@ -83,6 +83,13 @@ admin_user = {
     'role': 'admin',
 }
 
+hr_user = {
+    'email': 'hr@example.com',
+    'password': 'hrpass',
+    'name': 'HR Portal',
+    'role': 'hr',
+}
+
 employees = []
 permission_requests = []
 request_id_counter = 1
@@ -141,17 +148,21 @@ def find_user(email: str) -> Optional[dict]:
     email = email.lower()
     if email == admin_user['email']:
         return admin_user
+    if email == hr_user['email']:
+        return hr_user
     return next((user for user in employees if user['email'] == email), None)
 
 
 @api_router.post('/auth/login', response_model=LoginResponse)
 def login(request: LoginRequest):
     user = find_user(request.email)
-    if not user or user.get('password') != request.password or request.role not in ['employee', 'admin']:
+    if not user or user.get('password') != request.password or request.role not in ['employee', 'admin', 'hr']:
         raise HTTPException(status_code=401, detail='Invalid email, password, or role.')
     if request.role == 'admin' and user['email'] != admin_user['email']:
         raise HTTPException(status_code=401, detail='Admin login requires the admin account.')
-    if request.role == 'employee' and user['email'] == admin_user['email']:
+    if request.role == 'hr' and user['email'] != hr_user['email']:
+        raise HTTPException(status_code=401, detail='HR login requires the HR account.')
+    if request.role == 'employee' and user['email'] in [admin_user['email'], hr_user['email']]:
         raise HTTPException(status_code=401, detail='Employee login requires an employee account.')
 
     response_user = {
@@ -235,8 +246,47 @@ def admin_dashboard():
         'employees': employee_summaries,
     }
 
+@api_router.get('/hr/dashboard')
+def hr_dashboard():
+    total_hours = sum(sum(record['hours'] for record in user['records']) for user in employees)
+    total_present = sum(1 for user in employees for record in user['records'] if record['status'] != 'Absent')
+    total_possible = len(employees) * (len(employees[0]['records']) if employees else 0)
+    total_late = sum(1 for user in employees for record in user['records'] if record['status'] == 'Late')
+    employee_summaries = []
+    for user in employees:
+        present = sum(1 for record in user['records'] if record['status'] != 'Absent')
+        absent = sum(1 for record in user['records'] if record['status'] == 'Absent')
+        late = sum(1 for record in user['records'] if record['status'] == 'Late')
+        hours = sum(record['hours'] for record in user['records'])
+        employee_summaries.append({
+            'name': user['name'],
+            'email': user['email'],
+            'present': present,
+            'absent': absent,
+            'late': late,
+            'hours': hours,
+        })
+    return {
+        'summary': {
+            'employees': len(employees),
+            'totalHours': total_hours,
+            'onTimeRate': round((total_present / total_possible) * 100, 0) if total_possible else 0,
+            'totalLate': total_late,
+        },
+        'employees': employee_summaries,
+    }
+
+
 @api_router.get('/admin/user-history', response_model=List[AttendanceRecord])
 def admin_user_history(email: EmailStr = Query(...)):
+    user = find_user(email)
+    if not user or user['role'] != 'employee':
+        raise HTTPException(status_code=404, detail='Employee not found.')
+    return user['records']
+
+
+@api_router.get('/hr/user-history', response_model=List[AttendanceRecord])
+def hr_user_history(email: EmailStr = Query(...)):
     user = find_user(email)
     if not user or user['role'] != 'employee':
         raise HTTPException(status_code=404, detail='Employee not found.')
@@ -269,10 +319,21 @@ def get_permissions(email: EmailStr = Query(...)):
 def get_admin_permissions():
     return permission_requests
 
-@api_router.put('/admin/permissions/{req_id}', response_model=PermissionRequestModel)
-def update_permission(req_id: int = Path(...), payload: UpdatePermissionRequest = None):
+
+@api_router.get('/hr/permissions', response_model=List[PermissionRequestModel])
+def get_hr_permissions():
+    return permission_requests
+
+
+@api_router.put('/hr/permissions/{req_id}', response_model=PermissionRequestModel)
+def update_hr_permission(req_id: int = Path(...), payload: UpdatePermissionRequest = None):
     req = next((r for r in permission_requests if r['id'] == req_id), None)
     if not req:
         raise HTTPException(status_code=404, detail='Request not found')
     req['status'] = payload.status
     return req
+
+
+@api_router.put('/admin/permissions/{req_id}', response_model=PermissionRequestModel)
+def update_permission(req_id: int = Path(...), payload: UpdatePermissionRequest = None):
+    raise HTTPException(status_code=403, detail='Permission approvals are only available to HR.')
