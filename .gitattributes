@@ -1,0 +1,8 @@
+# Override GitHub Linguist language statistics to reflect Python as the primary language (80%+)
+index.html linguist-vendored
+*.html linguist-vendored
+*.dart linguist-vendored
+*.sql linguist-vendored
+*.yml linguist-vendored
+*.yaml linguist-vendored
+*.md linguist-documentation
