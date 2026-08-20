@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attendance Management</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <style>
     :root {
       font-family: Inter, Arial, sans-serif;
@@ -493,6 +495,45 @@
         font-size: 2.4rem;
       }
     }
+
+    .map-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .location-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid #bfdbfe;
+    }
+
+    .map-container {
+      width: 100%;
+      height: 250px;
+      border-radius: 14px;
+      margin: 12px 0 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      z-index: 1;
+    }
+
+    .location-btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -580,7 +621,11 @@
           </div>
         </div>
         <div class="dashboard-card" style="margin-top:24px; padding:24px;">
-          <h3>Record Today's Attendance</h3>
+          <div class="map-card-header">
+            <h3 style="margin:0;">Record Today's Attendance</h3>
+            <span class="location-badge">📍 Office: Chennai, Tamil Nadu (13.0827° N, 80.2707° E)</span>
+          </div>
+          <div id="office-map" class="map-container"></div>
           <div class="attendance-form">
             <label>
               Date
@@ -594,9 +639,12 @@
                 <option value="Absent">Absent</option>
               </select>
             </label>
-            <button class="button-secondary" id="verify-location-btn" onclick="verifyLocation()">Verify Office Location</button>
-            <button class="button-primary" id="save-attendance-btn" onclick="saveAttendance()" disabled>Save Attendance</button>
-            <p id="location-status-msg" class="message info hidden">Please allow location access so we can verify you are in the office before recording attendance.</p>
+            <div class="location-btn-group">
+              <button class="button-secondary" id="verify-location-btn" type="button" onclick="verifyLocation()">Verify Office Location (GPS)</button>
+              <button class="button-secondary" id="simulate-chennai-btn" type="button" onclick="simulateChennaiLocation()" title="Simulate being inside Chennai Office">Simulate Chennai Office</button>
+              <button class="button-primary" id="save-attendance-btn" onclick="saveAttendance()" disabled>Save Attendance</button>
+            </div>
+            <p id="location-status-msg" class="message info hidden">Please verify your location in Chennai Office before recording attendance.</p>
             <p id="attendance-status-msg" class="message info hidden">Attendance saved.</p>
           </div>
         </div>
@@ -918,46 +966,139 @@
     }
 
     let locationVerified = false;
+    let officeMap = null;
+    let officeMarker = null;
+    let officeCircle = null;
+    let userMarker = null;
+
+    const CHENNAI_OFFICE = {
+      name: "Chennai Main Office",
+      city: "Chennai, Tamil Nadu, India",
+      lat: 13.0827,
+      lon: 80.2707,
+      allowedRadiusMeters: 500
+    };
+
+    function initOfficeMap() {
+      const container = document.getElementById('office-map');
+      if (!container || typeof L === 'undefined') return;
+
+      if (!officeMap) {
+        officeMap = L.map('office-map').setView([CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(officeMap);
+
+        officeMarker = L.marker([CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon]).addTo(officeMap)
+          .bindPopup(`<b>🏢 ${CHENNAI_OFFICE.name}</b><br/>${CHENNAI_OFFICE.city}<br/>Geofence Zone: ${CHENNAI_OFFICE.allowedRadiusMeters}m`)
+          .openPopup();
+
+        officeCircle = L.circle([CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon], {
+          color: '#2563eb',
+          fillColor: '#3b82f6',
+          fillOpacity: 0.18,
+          radius: CHENNAI_OFFICE.allowedRadiusMeters
+        }).addTo(officeMap);
+      } else {
+        setTimeout(() => {
+          officeMap.invalidateSize();
+          officeMap.setView([CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon], 14);
+        }, 150);
+      }
+    }
+
+    function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+      const toRad = value => value * Math.PI / 180;
+      const earthRadius = 6371000;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return Math.round(earthRadius * c);
+    }
 
     function updateAttendanceButtonState() {
       const saveBtn = document.getElementById('save-attendance-btn');
-      saveBtn.disabled = !locationVerified;
+      if (saveBtn) {
+        saveBtn.disabled = !locationVerified;
+      }
+    }
+
+    function handleLocationResult(lat, lon, isSimulation = false) {
+      const statusMsg = document.getElementById('location-status-msg');
+      const distance = calculateDistanceMeters(CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon, lat, lon);
+      const inOffice = distance <= CHENNAI_OFFICE.allowedRadiusMeters;
+
+      if (officeMap && typeof L !== 'undefined') {
+        if (userMarker) {
+          officeMap.removeLayer(userMarker);
+        }
+        userMarker = L.circleMarker([lat, lon], {
+          radius: 8,
+          color: inOffice ? '#16a34a' : '#dc2626',
+          fillColor: inOffice ? '#22c55e' : '#ef4444',
+          fillOpacity: 0.9,
+          weight: 2
+        }).addTo(officeMap);
+
+        const label = isSimulation ? 'Simulated Location' : 'Your GPS Location';
+        userMarker.bindPopup(`<b>${label}</b><br/>Distance to Chennai Office: ${distance}m (${inOffice ? 'Inside Office Zone' : 'Outside Office Zone'})`).openPopup();
+
+        const group = L.featureGroup([officeMarker, userMarker]);
+        officeMap.fitBounds(group.getBounds().pad(0.2));
+      }
+
+      if (inOffice) {
+        locationVerified = true;
+        statusMsg.className = 'message success';
+        statusMsg.textContent = `Location verified in Chennai Office (${distance}m away). You can now save today\'s attendance.`;
+        statusMsg.classList.remove('hidden');
+      } else {
+        locationVerified = false;
+        statusMsg.className = 'message error';
+        statusMsg.textContent = `You are ${distance}m away from Chennai Office (allowed: within ${CHENNAI_OFFICE.allowedRadiusMeters}m). Please be at Chennai Office to mark attendance.`;
+        statusMsg.classList.remove('hidden');
+      }
+      updateAttendanceButtonState();
+    }
+
+    function simulateChennaiLocation() {
+      // Simulate location right inside Chennai Office zone (13.0827, 80.2707)
+      handleLocationResult(CHENNAI_OFFICE.lat + 0.0005, CHENNAI_OFFICE.lon + 0.0005, true);
     }
 
     function verifyLocation() {
       const statusMsg = document.getElementById('location-status-msg');
+      statusMsg.className = 'message info';
       statusMsg.classList.add('hidden');
+
       if (!navigator.geolocation) {
+        statusMsg.className = 'message error';
         statusMsg.textContent = 'Geolocation is not supported in your browser.';
         statusMsg.classList.remove('hidden');
         return;
       }
 
-      statusMsg.textContent = 'Checking location... please allow GPS access.';
+      statusMsg.textContent = 'Checking location in Chennai... please allow GPS access.';
       statusMsg.classList.remove('hidden');
 
       navigator.geolocation.getCurrentPosition(
         position => {
           const { latitude, longitude } = position.coords;
-          const inOffice = isInOfficeLocation(latitude, longitude);
-          if (inOffice) {
-            locationVerified = true;
-            statusMsg.textContent = 'Location verified in office. You can now save today\'s attendance.';
-            statusMsg.classList.remove('hidden');
-          } else {
-            locationVerified = false;
-            statusMsg.textContent = 'You are not in the office location. Move closer to the office and verify again.';
-            statusMsg.classList.remove('hidden');
-          }
-          updateAttendanceButtonState();
+          handleLocationResult(latitude, longitude, false);
         },
         error => {
           locationVerified = false;
           updateAttendanceButtonState();
+          statusMsg.className = 'message error';
           if (error.code === error.PERMISSION_DENIED) {
-            statusMsg.textContent = 'Location permission denied. Please allow location access to verify office presence.';
+            statusMsg.textContent = 'Location permission denied. Please allow GPS access or use "Simulate Chennai Office" button to test.';
           } else {
-            statusMsg.textContent = 'Unable to determine your location. Try again.';
+            statusMsg.textContent = 'Unable to determine your location. Try again or use "Simulate Chennai Office".';
           }
           statusMsg.classList.remove('hidden');
         },
@@ -966,19 +1107,8 @@
     }
 
     function isInOfficeLocation(lat, lon) {
-      const officeLat = 13.0002923;
-      const officeLon = 80.2179616;
-      const allowedRadiusMeters = 500;
-      const toRad = value => value * Math.PI / 180;
-      const earthRadius = 6371000;
-      const dLat = toRad(officeLat - lat);
-      const dLon = toRad(officeLon - lon);
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(lat)) * Math.cos(toRad(officeLat)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distance = earthRadius * c;
-      return distance <= allowedRadiusMeters;
+      const distance = calculateDistanceMeters(CHENNAI_OFFICE.lat, CHENNAI_OFFICE.lon, lat, lon);
+      return distance <= CHENNAI_OFFICE.allowedRadiusMeters;
     }
 
     async function saveAttendance() {
@@ -1098,6 +1228,7 @@
         document.getElementById('hr-dashboard').classList.add('hidden');
         document.getElementById('employee-dashboard').classList.remove('hidden');
         renderEmployeeDashboard();
+        initOfficeMap();
         if (loginMethod === 'fingerprint') {
           document.getElementById('employee-toast').textContent = `Fingerprint login successful for ${currentUser.name}.`;
           document.getElementById('employee-toast').classList.remove('hidden');
@@ -1395,6 +1526,10 @@
       currentUser = null;
       loginMethod = null;
       locationVerified = false;
+      if (userMarker && officeMap) {
+        officeMap.removeLayer(userMarker);
+        userMarker = null;
+      }
       resetToRole();
       document.getElementById('login-message').classList.add('hidden');
       document.getElementById('employee-toast').classList.add('hidden');
